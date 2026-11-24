@@ -1,0 +1,26 @@
+{
+ "M0": {
+  "share_quantiles_clipped": 2.944152005184869e-05,
+  "days_with_clipping": 3
+ },
+ "M1": {
+  "share_quantiles_clipped": 5.92782282923128e-07,
+  "days_with_clipping": 2
+ },
+ "M2": {
+  "share_quantiles_clipped": 0.0,
+  "days_with_clipping": 0
+ },
+ "M3-normal": {
+  "share_quantiles_clipped": 0.00012823856720570336,
+  "days_with_clipping": 33
+ },
+ "M3-JSU": {
+  "share_quantiles_clipped": 0.0010689840502047074,
+  "days_with_clipping": 233
+ },
+ "M4": {
+  "share_quantiles_clipped": 1.3633992507231943e-05,
+  "days_with_clipping": 4
+ }
+}

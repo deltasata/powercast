@@ -1,0 +1,10 @@
+{
+  "num_leaves": 15,
+  "learning_rate": 0.08881177185336277,
+  "n_estimators": 200,
+  "min_child_samples": 200,
+  "feature_fraction": 1.0,
+  "lambda_l2": 10.0,
+  "window": 1092,
+  "pinball5": 2.1366990798143357
+}

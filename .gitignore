@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Downloaded and derived data: large, re-created by scripts/
+data/
+
+# Local installs, model weights and run logs
+.cache/
+logs/

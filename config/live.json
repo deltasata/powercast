@@ -1,0 +1,8 @@
+{
+  "models": {
+    "M0": {"window": 364},
+    "M1": {"window": 364},
+    "M4": {"variant": "covariates"}
+  },
+  "primary": "M4"
+}
