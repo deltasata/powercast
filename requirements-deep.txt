@@ -1,6 +1,6 @@
-# Chronos-2 (model M4) for the daily job; torch is installed from the CPU index first
+# Chronos-2 (model M4) for the daily job, with the CPU build of PyTorch
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.14.1
+torch==2.14.1+cpu
 chronos-forecasting==2.3.2
 transformers==5.24.0
 accelerate==1.16.0

@@ -442,3 +442,24 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
   and 4.4 €/MWh (M1); the residual comes from the quarter-hour layer's Monte Carlo and
   data vintage.
 
+## Live forecast for 25 Nov 2026 (24 Nov)
+
+- The scheduled run at 10:20 failed: the load forecast for 25 Nov was on neither SMARD
+  nor Energy-Charts (checked again at 10:23). On 23 Nov SMARD had it at 10:10, so its
+  publication time varies; the rule "public at D−1 10:00" (D3.4) is the regulatory
+  deadline, not a guarantee.
+- Fix (`daily_forecast.wait_for_load`): the run polls every 5 minutes until the load
+  forecast for D is complete, up to 11:40; if it is still missing then, the plan's rule
+  for missing inputs applies (value one week earlier) and the forecast is flagged
+  `load_forecast_from_last_week`. The output now records both the start time and the
+  time the forecast was made (`started_berlin`, `issued_berlin`).
+- Re-run started 10:24: load forecast missing at 10:25, present on Energy-Charts at the
+  10:30 poll (still missing on SMARD); forecast written at 10:39 with M0, M1 and M4,
+  not late. Its `issued_berlin` field still shows the start time 10:24:58 (the field
+  was corrected afterwards for later runs).
+- Backtest note: the backtest uses the load forecast for D as known at the issue time
+  (11:00), consistent with both days observed (published by 10:10 and by 10:30).
+- `requirements-deep.txt` pins the CPU build `torch==2.14.1+cpu` (checked on the PyTorch
+  index for Python 3.12, Linux x86_64). When today's forecast already exists, a run
+  still refreshes the stored data, so a manual Actions run warms the data cache.
+

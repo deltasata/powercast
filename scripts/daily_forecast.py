@@ -87,6 +87,43 @@ def refresh(state: Path, today: str) -> dict[str, pd.DataFrame]:
     return {"prices": prices, "fund": fund}
 
 
+def day_index(day) -> pd.DatetimeIndex:
+    start = day.tz_localize(MARKET_TZ).tz_convert("UTC")
+    end = (day + pd.Timedelta(days=1)).tz_localize(MARKET_TZ).tz_convert("UTC")
+    return pd.date_range(start, end, freq="15min", inclusive="left")
+
+
+def wait_for_load(state: Path, now, day, wait: bool = True, every_s: int = 300,
+                  deadline=dt.time(11, 40)):
+    """Refresh until the load forecast for ``day`` is published (polling every 5 min).
+
+    The publication time varies (SMARD 10:10 on 23 Nov, after 10:23 on 24 Nov). If it is
+    still missing at ``deadline``, apply the plan's rule for missing inputs (section 3):
+    the value at the same time one week earlier. Returns (tables, filled: bool).
+    """
+    import time
+
+    idx = day_index(day)
+    while True:
+        tables = refresh(state, now.date().isoformat())
+        lf = tables["fund"]["load_forecast"].reindex(idx)
+        if lf.notna().all():
+            return tables, False
+        t = dt.datetime.now(MARKET_TZ)
+        if not wait or t.time() >= deadline:
+            break
+        print(f"{t:%H:%M} load forecast for {day.date()} not yet published; waiting",
+              flush=True)
+        time.sleep(every_s)
+    fund = tables["fund"].reindex(tables["fund"].index.union(idx))
+    prev = fund["load_forecast"].reindex(idx - pd.Timedelta(days=7)).to_numpy()
+    miss = fund.loc[idx, "load_forecast"].isna().to_numpy()
+    fund.loc[idx[miss], "load_forecast"] = prev[miss]
+    print(f"load forecast for {day.date()} missing at issue: {miss.sum()} values taken "
+          "from one week earlier", flush=True)
+    return {"prices": tables["prices"], "fund": fund}, True
+
+
 def info_set(tables, day):
     cut = nopeek.issue_time(day)
     return {"prices": nopeek.mask_unpublished(tables["prices"][["price", "mtu_min"]], cut),
@@ -180,14 +217,19 @@ def main() -> None:
     now = dt.datetime.now(MARKET_TZ)
     day = pd.Timestamp(a.day) if a.day else pd.Timestamp(now.date() + dt.timedelta(days=1))
     if (out / f"{day.date()}.npz").exists() and not a.force:
-        print(f"forecast for {day.date()} exists; nothing to do")
+        # still refresh the stored data, so a repeated or manual run keeps the cache warm
+        tables = refresh(state, now.date().isoformat())
+        tr = score_track(out, tables["prices"])
+        print(f"forecast for {day.date()} exists; data refreshed, track record "
+              f"{len(tr)} rows")
         return
     if now < (day - pd.Timedelta(hours=13, minutes=45)).tz_localize(MARKET_TZ) and not a.force:
         print("before 10:15 Berlin: the load forecast may not be published yet; exiting")
         return
-    late = now >= (day - pd.Timedelta(hours=12)).tz_localize(MARKET_TZ)
 
-    tables = refresh(state, now.date().isoformat())
+    tables, filled = wait_for_load(state, now, day, wait=not a.day)
+    # late = the forecast is made after the auction closed (12:00 on D−1)
+    late = dt.datetime.now(MARKET_TZ) >= (day - pd.Timedelta(hours=12)).tz_localize(MARKET_TZ)
     tb = info_set(tables, day)
     slot_q = {}
     if "M0" in cfg["models"]:
@@ -212,8 +254,10 @@ def main() -> None:
         mtu_q[name] = scores.sort_quantiles(evaluate.clip_to_limits(
             layer.apply(day, mtus, qm, seed=int(day.strftime("%Y%m%d"))), mtus["day"]))
 
-    meta = {"delivery_day": day.date().isoformat(), "issued_berlin": now.isoformat(),
-            "late": bool(late), "backfill": bool(a.day), "models": list(mtu_q),
+    meta = {"delivery_day": day.date().isoformat(), "started_berlin": now.isoformat(),
+            "issued_berlin": dt.datetime.now(MARKET_TZ).isoformat(),
+            "late": bool(late), "backfill": bool(a.day),
+            "load_forecast_from_last_week": bool(filled), "models": list(mtu_q),
             "primary": cfg["primary"],
             "information_set": f"published by {nopeek.issue_time(day).isoformat()}"}
     np.savez_compressed(out / f"{day.date()}.npz", meta=np.array(json.dumps(meta)),
