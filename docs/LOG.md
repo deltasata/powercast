@@ -463,3 +463,41 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
   index for Python 3.12, Linux x86_64). When today's forecast already exists, a run
   still refreshes the stored data, so a manual Actions run warms the data cache.
 
+
+## First GitHub Actions runs (24–25 Nov 2026)
+
+- Two scheduled runs on 24 Nov (started 20:41 and 21:20 Berlin, not at the 10:40
+  schedule: GitHub's scheduler delays or shifts runs) both failed in the Forecast step
+  within one second. The job's public step list and annotations show only
+  "exit code 1"; the full log needs a signed-in account.
+- Cause: `.gitignore` had the rule `data/`, which matches every folder named `data`,
+  including the code package `src/powercast/data/` (download, build, update, checks,
+  Energy-Charts reader). The six files were never committed, so the import failed on
+  GitHub, while every local run worked. Found with
+  `git ls-files -o -i --exclude-standard`; nothing else was missing (apart from the
+  files excluded on purpose).
+- Fix (commit 850d870, 25 Nov 09:37): the rule is now `/data/` (top-level data folder
+  only) and the package is committed. Trace scan clean; 23 tests pass.
+- Check: a fresh `git clone` of the fixed commit, run with an empty data folder as on
+  GitHub (`daily_forecast.py --day 2026-11-25`, refresh path), downloaded the full
+  SMARD history (6 034 files) and finished correctly in 212 s.
+- Side effect found: until this commit the public repository could not be run by
+  anyone cloning it.
+- Warnings (harmless for now): the actions used (`checkout@v4`, `setup-python@v5`,
+  `cache@v4`) target Node.js 20, which GitHub has deprecated; "Cache save failed" came
+  from the empty data folder of the failed runs.
+
+## Live forecast for 26 Nov 2026 and the new schedule (25 Nov)
+
+- No GitHub run started for either scheduled slot of 25 Nov (watched via the public API
+  every 90 s until 11:20 Berlin). Fallback: the forecast for 26 Nov was made on this
+  machine (`python scripts/daily_forecast.py`), started 11:21, written 11:24, not late;
+  load forecast for D present on SMARD/Energy-Charts. Log: `logs/live_2026-11-26.log`
+  (not committed).
+- First live scores (track record, one day each, so no error bars yet): 25 Nov CRPS
+  M4 9.88, M1 11.63, M0 73.31 €/MWh.
+- Schedule redesigned and actions upgraded after an independent review (D12.1, D12.2):
+  ten triggers through the night and morning, a wait step until 10:15 Berlin, checkout
+  of the newest `main` after the wait, publish with pull-rebase; `checkout@v7`,
+  `setup-python@v7`, `cache@v6`. Forecasts now record `runner` (`github-actions` or
+  `local`); the three forecasts so far (24–26 Nov) were all made locally.

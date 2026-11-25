@@ -43,6 +43,10 @@ the naive forecast (M0) and LEAR-QRA (M1) run alongside for comparison.
 A new forecast is published every morning by a scheduled GitHub Actions job
 (`.github/workflows/daily.yml`) in [`forecasts/live/`](forecasts/live/), together with
 the running score of all past live forecasts against the real prices (`track_record.csv`).
+GitHub starts scheduled jobs late, sometimes by hours, so the job is triggered many times
+through the night and waits until 10:15 Berlin; every forecast records when it was made,
+whether that was after the 12:00 auction (`late`), and where it ran (`runner`: GitHub
+Actions, or `local` for a fallback run by hand).
 
 ## Data
 

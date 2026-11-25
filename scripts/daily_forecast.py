@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -190,6 +191,7 @@ def score_track(out: Path, prices: pd.DataFrame) -> pd.DataFrame:
             ok = np.isfinite(y)
             rows.append({"delivery_day": day.date().isoformat(), "model": name,
                          "late": meta["late"], "backfill": meta.get("backfill", False),
+                         "runner": meta.get("runner", "local"),
                          "crps": float(scores.crps(y[ok], q[ok]).mean()),
                          "mae": float(np.abs(y[ok] - scores.median(q[ok])).mean()),
                          "cov80": float(scores.inside(y[ok], q[ok], 80).mean()),
@@ -257,6 +259,7 @@ def main() -> None:
     meta = {"delivery_day": day.date().isoformat(), "started_berlin": now.isoformat(),
             "issued_berlin": dt.datetime.now(MARKET_TZ).isoformat(),
             "late": bool(late), "backfill": bool(a.day),
+            "runner": "github-actions" if os.environ.get("GITHUB_ACTIONS") else "local",
             "load_forecast_from_last_week": bool(filled), "models": list(mtu_q),
             "primary": cfg["primary"],
             "information_set": f"published by {nopeek.issue_time(day).isoformat()}"}

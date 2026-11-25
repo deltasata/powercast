@@ -1,11 +1,23 @@
 name: daily forecast
 
-# 08:40 UTC = 10:40 Berlin in summer (CEST); 09:40 UTC = 10:40 Berlin in winter (CET).
-# The script exits at once if tomorrow's forecast already exists or it is before 10:15.
+# GitHub starts scheduled runs late, by up to many hours, and sometimes not at all
+# (observed 24-25 Nov 2026, D12.1 in docs/DECISIONS.md). So the job is triggered many times through the night
+# and morning, at odd minutes. A run that starts before 10:15 Berlin waits until then
+# (at most 3.5 h); a run that would wait longer stops at once and leaves the day to a
+# later trigger. If tomorrow's forecast already exists, the script only refreshes the
+# data and the track record. Runs are serialised by the concurrency group.
 on:
   schedule:
-    - cron: "40 8 * * *"
-    - cron: "40 9 * * *"
+    - cron: "17 23 * * *"
+    - cron: "47 2 * * *"
+    - cron: "23 5 * * *"
+    - cron: "53 6 * * *"
+    - cron: "37 7 * * *"
+    - cron: "13 8 * * *"
+    - cron: "43 8 * * *"
+    - cron: "13 9 * * *"
+    - cron: "43 9 * * *"
+    - cron: "13 10 * * *"
   workflow_dispatch:
 
 permissions:
@@ -18,50 +30,80 @@ concurrency:
 jobs:
   forecast:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 350
     steps:
-      - uses: actions/checkout@v4
+      - name: Wait until 10:15 Berlin
+        id: gate
+        run: |
+          now=$(date +%s)
+          target=$(TZ=Europe/Berlin date -d "today 10:15" +%s)
+          wait=$((target - now))
+          if [ "$wait" -gt 12600 ]; then
+            echo "more than 3.5 h before 10:15 Berlin; a later trigger makes the forecast"
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$wait" -gt 0 ]; then echo "waiting $wait s"; sleep "$wait"; fi
+          echo "go=true" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v5
+      # check out the newest main after waiting, so a forecast pushed meanwhile is seen
+      - if: steps.gate.outputs.go == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - if: steps.gate.outputs.go == 'true'
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install
+        if: steps.gate.outputs.go == 'true'
         run: |
           pip install -r requirements-live.txt
           pip install -r requirements-deep.txt
           pip install --no-deps -e .
 
       - name: Restore model weights
-        uses: actions/cache@v4
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/cache@v6
         with:
           path: .cache/hf
           key: hf-chronos-2-29ec3766
 
       - name: Restore data cache
-        uses: actions/cache/restore@v4
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/cache/restore@v6
         with:
           path: data/live
           key: live-${{ github.run_id }}
           restore-keys: live-
 
       - name: Forecast
+        if: steps.gate.outputs.go == 'true'
         env:
           HF_HOME: ${{ github.workspace }}/.cache/hf
         run: python scripts/daily_forecast.py --state data/live --out forecasts/live
 
       - name: Save data cache
-        if: always()
-        uses: actions/cache/save@v4
+        if: always() && steps.gate.outputs.go == 'true'
+        uses: actions/cache/save@v6
         with:
           path: data/live
           key: live-${{ github.run_id }}
 
       - name: Publish
+        if: steps.gate.outputs.go == 'true'
         run: |
           git config user.name "Satadru Bag"
           git config user.email "satadru.iucaa@gmail.com"
           git add forecasts/live
           if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
-          git commit -m "Daily forecast $(date -u +%Y-%m-%d)"
-          git push
+          days=$(git diff --cached --name-only --diff-filter=A -- 'forecasts/live/*.csv' \
+                 | xargs -r -n1 basename | sed 's/\.csv$//' | paste -sd' ')
+          git commit -m "Daily forecast ${days:-(track record update)}"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            sleep 20
+          done
+          exit 1

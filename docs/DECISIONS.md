@@ -327,3 +327,50 @@ choice; evidence; later decisions that depend on it.
 - **Affects:** `config/live.json`, the GitHub Actions job (needs PyTorch and the model
   weights, both on CPU).
 
+
+## Step 12
+
+Decisions from 25 Nov 2026 on were taken by an independent reviewer (a separate review
+run given the facts and the rules of the project, without access to the session); its
+verdict is recorded as given and was followed.
+
+### D12.1 Making the daily run start in time
+- **Question:** GitHub's scheduler started the runs of 24 Nov about 11 h late (19:41 and
+  20:20 UTC for the 08:40 and 09:40 UTC slots) and had started none of the 25 Nov slots
+  by 10:20 UTC. How to get a forecast before 12:00 Berlin every day?
+- **Options:**
+  - A. More cron triggers inside 08:15–10:45 UTC: simple; useless if every trigger is
+    hours late.
+  - B. Local cron job on the cluster as the main runner: on time when the machine is up;
+    the machine is shared and not guaranteed to run, and the plan names GitHub Actions.
+  - C. External free cron service calling `workflow_dispatch`: on time; needs a
+    registration and a token stored at a third party (not allowed without the owner).
+  - D. Triggers spread through the night and morning; a run that starts early waits in
+    the job until 10:15 Berlin; late or missed days stay in the track record, flagged;
+    a local run as manual fallback when a session is open.
+- **Chosen (reviewer):** D. Ten triggers at odd minutes (23:17, 02:47, 05:23, 06:53,
+  07:37, 08:13, 08:43, 09:13, 09:43, 10:13 UTC); job time limit 350 min.
+- **Implementation details added:** the wait is a separate first step, before the
+  checkout, so a run that waited checks out the newest `main` and sees a forecast that
+  was pushed meanwhile; a run that would wait more than 3.5 h stops at once (3.5 h wait +
+  up to 85 min waiting for the load forecast + about 25 min of work fits in 350 min).
+  The publish step pulls with rebase before pushing (three attempts). Each forecast
+  records `runner` (`github-actions` or `local`), also in `track_record.csv`.
+- **Evidence:** run list of the public API (24–25 Nov); GitHub documentation: scheduled
+  runs can be delayed under load or dropped, and the start of each hour is busiest.
+- **Risks:** on-time delivery is still not guaranteed; the on-time rate must be
+  reported from `track_record.csv` (`late`, `runner`). Public repositories stop scheduled
+  workflows after 60 days without activity; daily commits prevent this while runs
+  succeed.
+- **Affects:** `.github/workflows/daily.yml`, `scripts/daily_forecast.py`, README.
+
+### D12.2 Versions of the GitHub actions
+- **Question:** the actions used (`checkout@v4`, `setup-python@v5`, `cache@v4`) target
+  Node.js 20, which GitHub removed from its runners (changelog of 23 Sep 2026); they now
+  run only by being forced onto Node 24. Upgrade or keep?
+- **Options:** keep (works today, may break without notice); upgrade to the current
+  majors (small changes, none of their breaking changes touch this workflow).
+- **Chosen (reviewer):** upgrade: `checkout@v7` (v7.0.1), `setup-python@v7` (v7.1.0),
+  `cache@v6` (v6.1.0), all `node24` (checked on the release pages and `action.yml`).
+- **Affects:** `.github/workflows/daily.yml`; first run must confirm that both caches
+  are restored and that the push still works.
