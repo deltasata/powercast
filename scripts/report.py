@@ -90,6 +90,24 @@ def battery_table(bt) -> str:
     return "\n".join(rows)
 
 
+def robustness_table(rb, ev) -> str:
+    rows = ["| Network | CRPS of single seeds, mean ± sd (5 seeds) | Coverage 80 %, single seeds | "
+            "CRPS of the seed ensemble |", "|---|---|---|---|"]
+    for dist, name in (("normal", "M3-normal"), ("jsu", "M3-JSU")):
+        r = rb[f"M3-{dist}_seeds"]
+        rows.append(f"| {name} | {r['crps_mean']:.2f} ± {r['crps_sd']:.2f} | "
+                    f"{100 * r['cov80_mean']:.1f} ± {100 * r['cov80_sd']:.1f} | "
+                    f"{ev['models'][name]['all']['crps']['mean']:.2f} |")
+    rel = rb["crps_from_release"]
+    lo, hi = rel["days"]
+    rows += ["", f"After the release of the Chronos-2 weights ({lo} – {hi}):",
+             "", "| Model | CRPS (EUR/MWh) | DM p (M4 lower) |", "|---|---|---|"]
+    for n in ("M4", "M1", "M3-normal", "M3-JSU"):
+        pv = rb.get(f"dm_M4_lt_{n}_from_{rel['days'][0]}")
+        rows.append(f"| {n} | {ci(rel[n])} | {f'{pv:.3g}' if pv is not None else '–'} |")
+    return "\n".join(rows)
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--period", default="test")
@@ -104,6 +122,10 @@ def main() -> None:
     print(subset_table(ev) + "\n")
     print("### Diebold–Mariano p-values (H1: row model A has lower CRPS than column B)\n")
     print(dm_table(ev) + "\n")
+    rf = RESULTS_DIR / "evaluation" / f"robustness_{a.period}.json"
+    if rf.exists():
+        print("### Seed spread of the networks and the memorisation check\n")
+        print(robustness_table(json.loads(rf.read_text()), ev) + "\n")
     bf = RESULTS_DIR / "battery" / f"{a.period}.json"
     if bf.exists():
         print("### Battery (1 MW / 2 MWh, 90 % round trip, one cycle per day)\n")

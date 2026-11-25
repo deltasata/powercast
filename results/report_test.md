@@ -53,6 +53,22 @@ R3 scored on hourly mean prices (comparable with R0–R2):
 | M3-JSU | **< 0.001** | 0.371 | **< 0.001** | 0.445 | – | 1.000 |
 | M4 | **< 0.001** | **< 0.001** | **< 0.001** | **< 0.001** | **< 0.001** | – |
 
+### Seed spread of the networks and the memorisation check
+
+| Network | CRPS of single seeds, mean ± sd (5 seeds) | Coverage 80 %, single seeds | CRPS of the seed ensemble |
+|---|---|---|---|
+| M3-normal | 17.99 ± 0.12 | 81.1 ± 0.2 | 17.43 |
+| M3-JSU | 17.61 ± 0.09 | 79.5 ± 0.1 | 17.42 |
+
+After the release of the Chronos-2 weights (2025-11-01 – 2026-10-31):
+
+| Model | CRPS (EUR/MWh) | DM p (M4 lower) |
+|---|---|---|
+| M4 | 16.07 [13.98, 18.00] | – |
+| M1 | 16.97 [14.53, 18.90] | 0.00264 |
+| M3-normal | 16.80 [14.34, 18.79] | 0.0208 |
+| M3-JSU | 16.67 [14.23, 18.55] | 0.0474 |
+
 ### Battery (1 MW / 2 MWh, 90 % round trip, one cycle per day)
 
 | Schedule from | Profit (EUR/MW/yr) | Share of perfect foresight | Difference to M0 (EUR/MW/yr) | DM p (more profit than M0) |

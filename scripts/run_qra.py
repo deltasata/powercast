@@ -4,6 +4,10 @@ Usage:
     python scripts/run_qra.py --points data/forecasts/lear_points/<file>.parquet \
         --start 2019-01-01 --end 2020-12-31 --window 182 --snapshot 2026-11-23
 
+``--points`` takes one or more files of LEAR point forecasts (from scripts/run_lear.py);
+they are joined in time order, so the QRA window can reach back into an earlier run
+(the test period starts in 2021 and its 364-day window needs the LEAR forecasts of 2020).
+
 For each delivery day D, fits the quantile regressions on the ``window`` days before D
 (LEAR forecasts and real prices of those days are known at issue time) and predicts D.
 Saves data/forecasts/m1_lear_qra/w<window>_<start>_<end>.npz.
@@ -24,14 +28,16 @@ from powercast.models import lear
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--points", required=True)
+    p.add_argument("--points", nargs="+", required=True)
     p.add_argument("--snapshot", required=True)
     p.add_argument("--start", required=True)
     p.add_argument("--end", required=True)
     p.add_argument("--window", type=int, required=True)
     p.add_argument("--jobs", type=int, default=60)
     a = p.parse_args()
-    pts = pd.read_parquet(a.points)
+    pts = pd.concat([pd.read_parquet(f) for f in a.points]).sort_index()
+    if pts.index.duplicated().any():
+        raise ValueError("the LEAR files overlap")
     nw = len(lear.WINDOWS)
     P = pts.to_numpy().reshape(len(pts), 24, nw)
     t = dataset.load(a.snapshot)

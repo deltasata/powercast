@@ -25,7 +25,7 @@ The project asks three questions, answered on a test period of almost six years
 
 1. **A pretrained foundation model, used without any training on this market, gives the
    best forecasts.** Chronos-2 has a CRPS of 15.4 €/MWh on the test period, 12 % below
-   the best classical model (LEAR with quantile regression, 17.5 €/MWh), and wins in every
+   the best simple model (LEAR with quantile regression, 17.5 €/MWh), and wins in every
    market period, including the year after its weights were published.
 2. **The distributional neural network does not beat the linear benchmark** on the test
    period (17.4 vs 17.5 €/MWh, Diebold–Mariano p = 0.4), although it did on validation.
@@ -36,8 +36,12 @@ The project asks three questions, answered on a test period of almost six years
 
 ## The forecast
 
-For delivery day D the forecast is issued at **11:00 Berlin time on day D−1** and gives,
-for every MTU of D, the quantiles of the price at the 99 levels τ = 0.01, 0.02, …, 0.99.
+For delivery day D the forecast uses only information published by **11:00 Berlin time
+on day D−1**, an hour before the auction closes at 12:00; the daily job starts from 10:15
+and records the actual time each forecast was made. For every market time unit (MTU: an
+hour before October 2025, a quarter-hour since) of D it gives the quantiles of the price
+at the 99 levels τ = 0.01, 0.02, …, 0.99 (all 99 in the `.npz` files; the `.csv` files
+show nine of them).
 The published forecast is that of Chronos-2 (M4), the best model on the test period;
 the naive forecast (M0) and LEAR-QRA (M1) run alongside for comparison.
 A new forecast is published every morning by a scheduled GitHub Actions job
@@ -46,7 +50,10 @@ the running score of all past live forecasts against the real prices (`track_rec
 GitHub starts scheduled jobs late, sometimes by hours, so the job is triggered many times
 through the night and waits until 10:15 Berlin; every forecast records when it was made,
 whether that was after the 12:00 auction (`late`), and where it ran (`runner`: GitHub
-Actions, or `local` for a fallback run by hand).
+Actions, or `local` for a fallback run by hand). So far the scheduled job has not started
+in time: the forecasts of 24–26 Nov 2026 were made by the local fallback, all before the
+auction (`runner` in `track_record.csv`; files from before 27 Nov have no `runner` field
+and count as local).
 
 ## Data
 
@@ -91,7 +98,7 @@ model.
 | ID | Model | Class |
 |---|---|---|
 | M0 | Naive: price of the same hour one week earlier, plus the empirical quantiles of this rule's errors over the last 364 days | simple |
-| M1 | LEAR-QRA: LASSO-estimated autoregressive models (Lago et al. 2021) on 4 training windows, combined by quantile regression (Nowotarski & Weron 2015) | simple |
+| M1 | LEAR-QRA: LASSO-estimated (L1-penalised) autoregressive models (Lago et al. 2021) on 4 training windows, combined by quantile regression averaging, QRA (Nowotarski & Weron 2015) | simple |
 | M2 | LightGBM gradient-boosted trees with quantile loss | simple |
 | M3 | Distributional neural network (Marcjasz et al. 2023), normal and Johnson's SU outputs, 5 random seeds | complex |
 | M4 | Chronos-2, a pretrained time-series foundation model, used without retraining | complex |
@@ -111,9 +118,10 @@ The full evaluation protocol was written before any model was trained:
 - **Rolling forward as in real use:** each day is forecast from data before it; models
   are refitted daily (M0, M1) or weekly (M2, M3).
 - **Scores:** CRPS, the mean pinball loss over the 99 quantile levels, in €/MWh (for a
-  point forecast it equals the absolute error); MAE of the median; coverage of the
-  central 50, 80, 90 and 98 % intervals; PIT histograms (the rank of the real price
-  within the forecast distribution, flat if calibrated). Spikes and negative prices are
+  point forecast it equals the absolute error); MAE (mean absolute error) of the median;
+  coverage of the central 50, 80, 90 and 98 % intervals; PIT (probability integral
+  transform) histograms (the rank of the real price within the forecast distribution,
+  flat if calibrated). Spikes and negative prices are
   kept and also scored separately.
 - **Error bars:** 95 % intervals from a moving-block bootstrap over days (14-day
   blocks); Diebold–Mariano tests before claiming that one model beats another.
@@ -128,12 +136,17 @@ Every design choice, with the options considered and the evidence, is in
 Test period 2021-01-01 – 2026-10-31 (2 130 days, 79 635 prices), run once with settings
 frozen on validation. Intervals are 95 % moving-block bootstrap intervals over days. All
 tables are produced by `scripts/report.py` from `results/` (full version:
-[`results/report_test.md`](results/report_test.md)).
+[`results/report_test.md`](results/report_test.md)). Results not shown here are saved
+there too: CRPS intervals with 7- and 28-day bootstrap blocks and scores by hour
+([`results/evaluation/test.json`](results/evaluation/test.json)), battery profit by market
+period ([`results/battery/test.json`](results/battery/test.json)), and the seed spread of
+the networks and the memorisation check
+([`results/evaluation/robustness_test.json`](results/evaluation/robustness_test.json)).
 
 **Terms.** *CRPS* (continuous ranked probability score): the mean pinball loss over the
 99 quantiles, in €/MWh; it rewards forecasts that are both sharp and correct, and equals
 the absolute error for a point forecast. *Coverage*: the share of real prices inside
-the central 80 % interval of the forecast (calibrated: 80 %). *Diebold–Mariano test*:
+the central 50, 80, 90 or 98 % interval of the forecast (calibrated: the nominal level). *Diebold–Mariano test*:
 a paired test on the daily score differences of two models.
 
 | Model | CRPS (€/MWh) | MAE of median (€/MWh) | Coverage 50 / 80 / 90 / 98 % |
@@ -166,6 +179,11 @@ p = 0.03 for JSU). A plausible reason, not tested here: the network is refitted 
 on three years dominated by calm prices, while LEAR is refitted daily and includes a
 short 56-day window that follows a new price level quickly.
 
+**Seeds.** Each network is an average over five random seeds. A single seed is clearly
+worse: CRPS 17.99 ± 0.12 €/MWh (normal) and 17.61 ± 0.09 (JSU), mean ± standard deviation
+over the seeds, against 17.43 and 17.42 for the averages; a single seed scores worse
+than LEAR (17.49). The seed-to-seed spread is small compared with the gap to Chronos-2.
+
 **Calibration.** Chronos-2 and the JSU network are close to calibrated at every level;
 LightGBM's intervals are much too narrow (66 % instead of 80 %), the naive and LEAR
 forecasts slightly so.
@@ -175,7 +193,8 @@ forecasts slightly so.
 
 The PIT histogram is the distribution of the forecast's cumulative probability at the
 real price: flat if calibrated; peaks at both ends mean too-narrow intervals (M2);
-a hump means too-wide or shifted ones (M3 normal).
+a hump off the centre means biased forecasts (M3 normal: its hump near 0.7 means the
+real price tends to lie above the forecast median, so the forecasts are too low).
 
 **Spikes and negative prices** are kept in every score and scored separately: on the
 prices above the previous year's 99th percentile, the 80 % interval of the best models
@@ -200,19 +219,21 @@ real prices. Perfect foresight earns 75 547 [69 762, 81 821] €/MW/yr; the naiv
 | M3 network, JSU | +5 894 [+4 998, +6 698] | 89.5 % |
 | **M4 Chronos-2** | **+6 725** [+5 873, +7 561] | **90.6 %** |
 
-The profit order follows the CRPS order. Chronos-2 earns 2 003 [1 448, 2 643] €/MW/yr
-more than LEAR (Diebold–Mariano p = 2 × 10⁻¹² on daily profits).
+The profit order follows the CRPS order (the two networks' CRPS are indistinguishable,
+so their order is not meaningful). Chronos-2 earns 2 003 [1 448, 2 643] €/MW/yr
+more than LEAR (Diebold–Mariano p = 2.5 × 10⁻¹² on daily profits).
 
 **Could Chronos-2 have memorised the prices?** Its pretraining data are not fully known.
 The weights used are byte-identical to the first published version (30 Oct 2025). On
 the 365 days from 1 Nov 2025, which it cannot have seen, it still beats LEAR
-(16.07 vs 16.97 €/MWh, p = 0.003) and both networks (p ≤ 0.05).
+(CRPS 16.07 [13.98, 18.00] vs 16.97 [14.53, 18.90] €/MWh, p = 0.003) and both networks
+(p ≤ 0.05).
 
 ## What did not work, and limits
 
 - **The neural network's tails explode.** Prices are modelled after the transform
-  asinh((p − median)/MAD); far-tail quantiles of the network, mapped back with sinh,
-  reached ±∞ on some days. All forecasts are therefore clipped to the auction's price
+  asinh((p − median)/MAD), with MAD the median absolute deviation; far-tail quantiles of
+  the network, mapped back with sinh, reached ±∞ on some days. All forecasts are therefore clipped to the auction's price
   limits (−500 and 3 000 / 4 000 €/MWh), a change made before any test score was seen
   and recorded in the evaluation plan. It touches 0.1 % of the JSU network's quantiles.
 - **The network's validation advantage did not hold** on the test period: on 2019–2020 it
@@ -250,13 +271,30 @@ python scripts/run_qra.py   --snapshot $S --points data/forecasts/lear_points/${
                             --window 364 --start 2019-01-01 --end 2020-12-31
 python scripts/tune_gbt.py  --snapshot $S
 python scripts/tune_ddnn.py --snapshot $S --dist normal      # and --dist jsu
-python scripts/run_model.py --model chronos --variant covariates --snapshot $S \
-                            --start 2019-01-01 --end 2020-12-31
+V="--snapshot $S --start 2019-01-01 --end 2020-12-31"
+python scripts/run_model.py --model gbt  --config results/tuning/gbt_final.json $V
+python scripts/run_model.py --model ddnn --config results/tuning/ddnn_normal_final.json \
+                            --seeds 0 1 2 3 4 $V            # and ddnn_jsu_final.json
+python scripts/ensemble_seeds.py --snapshot $S --out data/forecasts/ddnn/normal_ens_2019-01-01_2020-12-31.npz \
+                            data/forecasts/ddnn/normal_seed{0,1,2,3,4}_2019-01-01_2020-12-31.npz
+python scripts/run_model.py --model chronos --variant covariates $V
 
-# test (2021-01-01 - 2026-10-31), same commands with --start 2021-01-01 --end 2026-10-31,
-# then (each model as NAME=path to its forecast file)
+# test (2021-01-01 - 2026-10-31): the same model commands with these dates; M1 needs the
+# LEAR forecasts of 2020 for its first QRA window, so both LEAR files are passed
+T="--snapshot $S --start 2021-01-01 --end 2026-10-31"
+python scripts/run_naive.py $T --window 364
+python scripts/run_lear.py  $T
+python scripts/run_qra.py   $T --window 364 --points \
+    data/forecasts/lear_points/${S}_2018-01-01_2020-12-31.parquet \
+    data/forecasts/lear_points/${S}_2021-01-01_2026-10-31.parquet
+python scripts/run_model.py --model gbt  --config results/tuning/gbt_final.json $T
+python scripts/run_model.py --model ddnn --config results/tuning/ddnn_normal_final.json --seeds 0 1 2 3 4 $T
+python scripts/ensemble_seeds.py ...                        # as above, test files
+python scripts/run_model.py --model chronos --variant covariates $T
+# then scoring, once (each model as NAME=path to its forecast file)
 python scripts/evaluate_models.py --snapshot $S --period test --forecast M0=... --forecast M4=...
 python scripts/run_battery.py     --snapshot $S --period test --forecast M0=... --forecast M4=...
+python scripts/robustness.py      --snapshot $S
 python scripts/make_figures.py --period test
 python scripts/report.py --period test
 ```

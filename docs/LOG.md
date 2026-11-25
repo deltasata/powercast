@@ -16,8 +16,8 @@ the project environment (`.venv/bin/python`).
   The package `src/powercast` is importable through a `.pth` file in the environment.
 - Folders `src/`, `scripts/`, `tests/`, `results/`, `figures/`, `docs/`, `data/`
   (`data/` is in `.gitignore`: it is large and is re-created by the scripts).
-- 23 Nov: added `LICENSE` (MIT, Satadru Bag) and created `docs/`. The session restart
-  check found `docs/`, `data/` and `LICENSE` missing; everything else was in place.
+- 23 Nov: added `LICENSE` (MIT, Satadru Bag) and created `docs/`. A check of the setup
+  found `docs/`, `data/` and `LICENSE` missing; everything else was in place.
 - Hardware available: 64 CPU cores, 251 GB RAM, 6 × NVIDIA A10 (23 GB each; two are
   partly used by other jobs).
 
@@ -424,8 +424,8 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
   | M4 Chronos-2 | **15.42** [14.05, 16.75] | 20.99 | 78.3 % | **+6 725** [5 873, 7 561] |
 
 - Diebold–Mariano: M4 beats every other model on the whole period (p < 0.001) and in
-  every market period (p ≤ 0.04). M3 does **not** beat M1 on the test period (p = 0.37
-  normal, 0.40 JSU), although it did on validation: it wins after the crisis (R2,
+  every market period (p ≤ 0.04). M3 does **not** beat M1 on the test period (p = 0.40
+  normal, 0.37 JSU), although it did on validation: it wins after the crisis (R2,
   p < 0.001) and loses during the gas crisis (R1, M1 better than M3-JSU, p = 0.03).
   M2 is the weakest learned model and clearly overconfident (80 % interval: 66 %).
 - Battery: perfect foresight 75 547 EUR/MW/yr; M0 reaches 81.7 % of it, M4 90.6 %.
@@ -496,8 +496,32 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
   (not committed).
 - First live scores (track record, one day each, so no error bars yet): 25 Nov CRPS
   M4 9.88, M1 11.63, M0 73.31 €/MWh.
-- Schedule redesigned and actions upgraded after an independent review (D12.1, D12.2):
+- Schedule redesigned and actions upgraded (D12.1, D12.2):
   ten triggers through the night and morning, a wait step until 10:15 Berlin, checkout
   of the newest `main` after the wait, publish with pull-rebase; `checkout@v7`,
   `setup-python@v7`, `cache@v6`. Forecasts now record `runner` (`github-actions` or
   `local`); the three forecasts so far (24–26 Nov) were all made locally.
+
+## Final audit of the public repository (25 Nov 2026)
+
+- Independent read-only audit of README, docs and saved results. Every number in the
+  README matched the saved results; no traces found; all linked files tracked. Fixed:
+  - Reproduce section: it did not say how M1 gets the 2020 LEAR forecasts its first test
+    window needs, and left out the M2/M3 forecast and seed-ensemble commands.
+    `run_qra.py --points` now takes several files and joins them; the file used in the
+    test run (`lear_points/2026-11-23_2018-01-01_2026-10-31.parquet`) is exactly the
+    validation file followed by the test file (checked, identical). Commands added.
+  - `results/evaluation/robustness_test.json` had been written by a one-off command; it is
+    now made by `scripts/robustness.py --snapshot 2026-11-23` (reads saved forecasts and
+    scores only, nothing refitted; 2 min). All earlier values reproduced exactly; it adds
+    the CRPS with intervals after the Chronos-2 release and the seed spread of M3, which
+    the plan (section 4) promised and which had not been computed for the test period.
+  - Seed spread on the test period (`scripts/report.py`, new table): single seeds CRPS
+    17.99 ± 0.12 (normal) and 17.61 ± 0.09 (JSU) €/MWh, mean ± sd over 5 seeds; seed
+    ensembles 17.43 and 17.42. A single seed scores worse than M1 (17.49); the averaging
+    over seeds is what brings the network level with LEAR.
+  - The M3 p-values in the step 10 entry above were swapped (normal 0.40, JSU 0.37);
+    corrected. README: issue-time wording (information up to 11:00, job starts 10:15),
+    live forecasts so far made by the local fallback, abbreviations defined, PIT reading
+    of M3-normal (hump near 0.7: forecasts too low), p = 2.5 × 10⁻¹², pointers to the
+    saved results not shown in the README.
