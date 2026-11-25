@@ -12,7 +12,7 @@ dist/
 .ipynb_checkpoints/
 
 # Downloaded and derived data: large, re-created by scripts/
-data/
+/data/
 
 # Local installs, model weights and run logs
 .cache/
