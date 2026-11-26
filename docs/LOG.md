@@ -525,3 +525,15 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
     live forecasts so far made by the local fallback, abbreviations defined, PIT reading
     of M3-normal (hump near 0.7: forecasts too low), p = 2.5 × 10⁻¹², pointers to the
     saved results not shown in the README.
+
+## Live forecast for 27 Nov 2026 (26 Nov)
+
+- New schedule, first night: of the ten triggers, GitHub started exactly one run, at
+  06:10 Berlin (05:10 UTC). Its gate step computed a wait of 4 h 05 min to 10:15, more
+  than the 3.5 h cap, and stopped (7 s, "success"). No other trigger produced a run by
+  11:20 Berlin.
+- Fallback: forecast for 27 Nov made on this machine, started 11:25, written 11:33, not
+  late, `runner: local`; committed a9ce666.
+- Track record so far (one day each, no error bars): 26 Nov CRPS M4 35.86, M1 22.84,
+  M0 45.08 €/MWh — the first live day on which LEAR beat Chronos-2. 25 Nov: M4 9.88,
+  M1 11.63.
