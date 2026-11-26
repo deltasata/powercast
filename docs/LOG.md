@@ -537,3 +537,7 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
 - Track record so far (one day each, no error bars): 26 Nov CRPS M4 35.86, M1 22.84,
   M0 45.08 €/MWh — the first live day on which LEAR beat Chronos-2. 25 Nov: M4 9.88,
   M1 11.63.
+- Scheduling changed again (D12.3): runs hand over to fresh runs with `workflow_dispatch`
+  when they start too early; `scripts/gate.py` with replay tests (`tests/test_gate.py`,
+  6 tests; 29 tests in total pass). Checked against GitHub at 11:37: the gate aims at
+  28 Nov (27 Nov exists) and would hand over after 330 min.

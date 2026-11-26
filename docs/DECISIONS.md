@@ -370,3 +370,33 @@ choice; evidence; later decisions that depend on it.
   `cache@v6` (v6.1.0), all `node24` (checked on the release pages and `action.yml`).
 - **Affects:** `.github/workflows/daily.yml`; first run must confirm that both caches
   are restored and that the push still works.
+
+### D12.3 Hand-over between runs
+- **Question:** with D12.1, GitHub started one of ten triggers in the night to 26 Nov
+  (06:10 Berlin); it needed a 4 h 05 min wait, more than the 3.5 h cap, and stopped. How
+  to turn "some trigger fires at some time of day" into an on-time forecast?
+- **Options:**
+  - A. Raise the wait cap: the job limit (355 min) minus up to 110 min of work after
+    10:15 allows at most about 230 min, which still misses the 26 Nov run.
+  - B. Hand-over: a run that is too early sleeps, then starts a fresh run with
+    `workflow_dispatch` (GitHub documents that this event, unlike others, does create
+    runs when sent with the built-in token), which decides again.
+  - B2. A chain that never ends (every run hands over): independent of the scheduler,
+    but runners sit idle all day, which GitHub's terms discourage.
+  - C. Local runs by hand as the main path.
+- **Chosen:** B with a 230 min wait cap, and C as fallback. Each run decides from the
+  clock and the forecasts on main (`scripts/gate.py`): target = next delivery day without
+  a forecast, issue time 10:15 Berlin the day before; past it: forecast now; within
+  230 min: wait and forecast; otherwise sleep min(wait − 180 min, 330 min) and hand over.
+  At most 6 hand-overs per chain; a run that forecasts never hands over, so each chain
+  ends. Twelve triggers spread over all 24 h, so any one of them seeds the next morning.
+- **Evidence:** replay of the runs GitHub actually started (`tests/test_gate.py`): the
+  26 Nov 06:10 run hands over once and forecasts at 10:15; the 24 Nov 19:41 run reaches
+  the next morning in two hand-overs. Duplicates are prevented by the concurrency group
+  (one running, one pending; a new pending run replaces the old one) and by every
+  decision depending only on the clock and main.
+- **Risks:** a day with no trigger at all still needs the local fallback; the delay of a
+  dispatched run is not documented (50 min of slack assumed; to be measured); a failed
+  dispatch ends that day's chain until the next trigger.
+- **Affects:** `.github/workflows/daily.yml` (`actions: write` permission),
+  `scripts/gate.py`, README.
