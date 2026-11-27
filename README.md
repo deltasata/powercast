@@ -52,9 +52,9 @@ start either waits until 10:15 Berlin and forecasts, or, if that is too far off,
 and starts a fresh run of the job, which decides again (`scripts/gate.py`). Every
 forecast records when it was made,
 whether that was after the 12:00 auction (`late`), and where it ran (`runner`: GitHub
-Actions, or `local` for a fallback run by hand). So far the scheduled job has not started
-in time: the forecasts for 24–27 Nov 2026 were made by the local fallback, all before the
-auction (`runner` in `track_record.csv`; files from before 27 Nov have no `runner` field
+Actions, or `local` for a fallback run by hand). The forecasts for 24–27 Nov 2026 were
+made by the local fallback, all before the auction; from 28 Nov the GitHub job makes
+them (`runner` in `track_record.csv`; files from before 27 Nov have no `runner` field
 and count as local).
 
 ## Data

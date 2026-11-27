@@ -541,3 +541,30 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
   when they start too early; `scripts/gate.py` with replay tests (`tests/test_gate.py`,
   6 tests; 29 tests in total pass). Checked against GitHub at 11:37: the gate aims at
   28 Nov (27 Nov exists) and would hand over after 330 min.
+
+## First forecast made by the GitHub job (27 Nov 2026)
+
+- The forecast for 28 Nov was made by GitHub Actions on its own: started 10:16, written
+  10:24, not late, `runner: github-actions`, load forecast for D present (commit e87ce18).
+  The 27 Nov scores were added to the track record in the same run.
+- How it got there (public run list and step times of the API, Berlin time). A
+  scheduled run started 26 Nov 12:31 and handed over four times: 18:01, 23:31, 05:01
+  (each after the 330 min sleep cap, the last after 133 min), then the 07:15 run waited
+  180 min until 10:15 and forecast. Four hand-overs of the six allowed.
+- Delay of a hand-over (open point of D12.3, 50 min assumed): each fresh run was
+  created within 1 s of the request and its job started 5–6 s later, in all four cases.
+- Scheduled triggers: GitHub started 13 scheduled runs between 26 Nov 12:31 and 27 Nov
+  16:39 (one the night before). All but two queued behind the running chain and were
+  replaced in the concurrency group (`cancelled`), as designed. The run queued at 09:39
+  started at 10:24, after the forecast, found 28 Nov done and began the chain for 29 Nov.
+- Caches: weights (448 MB) and data (13 MB) were saved for the first time by this run
+  (`/actions/caches`), so it started cold: install 2 min, forecast 8 min. The next run
+  should restore both.
+- Track record, 27 Nov: CRPS M4 18.66, M1 13.17, M0 62.84 €/MWh. Three live days of
+  M4 so far (25–27 Nov); LEAR is better on two of them. Too few, and too correlated, to
+  compare with the test period; to be summarised with an error bar once weeks exist.
+- Side effect, not intended by D12.3: since 26 Nov 12:31 one runner has been busy
+  without a break, almost all of it sleeping. A scheduled trigger queued behind a chain
+  starts the next chain as soon as the forecast is made, so in practice the job behaves
+  like option B2 (an endless chain), which D12.3 set aside because of GitHub's terms.
+  Open; to be decided.
