@@ -1,25 +1,27 @@
 name: daily forecast
 
-# GitHub starts few of the scheduled triggers of this repository, at unpredictable times
-# (D12.1, D12.3 in docs/DECISIONS.md). Each run therefore decides with scripts/gate.py:
-# forecast now, wait until 10:15 Berlin (at most 230 min) and forecast, or hand over to a
-# fresh run of this workflow after a sleep (at most 6 hand-overs; a run that forecasts
-# never hands over). Any trigger that fires during the day thus leads to an on-time
-# forecast the next morning. Runs are serialised by the concurrency group.
+# GitHub starts the scheduled triggers of this repository late (0-3 h) and sometimes not
+# at all (D12.1, D12.3, D12.4 in docs/DECISIONS.md). Each run therefore decides with
+# scripts/gate.py: forecast now, wait until 10:15 Berlin (at most 230 min) and forecast,
+# hand over to a fresh run of this workflow after a sleep, or stop if 10:15 is more than
+# 8 h away. The triggers lie in 01:17-07:53 UTC, inside that window in winter and summer
+# time (02:15-10:15 Berlin is 01:15-09:15 UTC in winter, 00:15-08:15 UTC in summer); a
+# trigger that GitHub starts after 10:15 forecasts at once. Runs are serialised by the
+# concurrency group.
 on:
   schedule:
-    - cron: "17 0 * * *"
-    - cron: "47 2 * * *"
-    - cron: "23 4 * * *"
-    - cron: "53 5 * * *"
-    - cron: "37 7 * * *"
-    - cron: "13 8 * * *"
-    - cron: "13 9 * * *"
-    - cron: "43 10 * * *"
-    - cron: "7 13 * * *"
-    - cron: "37 15 * * *"
-    - cron: "23 18 * * *"
-    - cron: "13 21 * * *"
+    - cron: "17 1 * * *"
+    - cron: "53 1 * * *"
+    - cron: "29 2 * * *"
+    - cron: "7 3 * * *"
+    - cron: "41 3 * * *"
+    - cron: "19 4 * * *"
+    - cron: "53 4 * * *"
+    - cron: "31 5 * * *"
+    - cron: "7 6 * * *"
+    - cron: "43 6 * * *"
+    - cron: "19 7 * * *"
+    - cron: "53 7 * * *"
   workflow_dispatch:
     inputs:
       hop:

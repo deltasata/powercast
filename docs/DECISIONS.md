@@ -400,3 +400,32 @@ choice; evidence; later decisions that depend on it.
   dispatch ends that day's chain until the next trigger.
 - **Affects:** `.github/workflows/daily.yml` (`actions: write` permission),
   `scripts/gate.py`, README.
+
+### D12.4 Limiting the hand-over chain to a window before 10:15
+- **Question:** with D12.3, a scheduled trigger queued behind a chain starts the next
+  chain as soon as the forecast is made, so from 26 Nov 12:31 a runner was busy without
+  a break, almost all of it sleeping: in effect option B2, set aside in D12.3 because
+  GitHub's terms discourage idle runners. How to keep the on-time forecast and drop the
+  idle hours?
+- **Options:**
+  - A. Keep D12.3: on time on every night seen; a runner busy 24 h a day.
+  - B. Window: a run more than W hours before 10:15 stops at once; triggers moved into
+    the window. Runner busy at most W h plus about 10 min a day; a night on which GitHub
+    starts no trigger inside the window needs the local fallback.
+  - C. No hand-over at all (wait cap 230 min only): least idle time, but it would have
+    missed the night of 25–26 Nov (one trigger, at 06:10, 4 h 05 min before 10:15).
+- **Chosen:** B with W = 8 h (02:15–10:15 Berlin), twice the longest gap to 10:15 seen
+  on a night that was served (4 h 05 min). Twelve triggers between 01:17 and 07:53 UTC,
+  inside the window in both winter and summer time; a trigger started after 10:15
+  forecasts at once, still before the auction if it starts before about 11:30. At most
+  2 hand-overs (one suffices inside the window).
+- **Evidence:** run list of the public API, 26–28 Nov: GitHub started 22 scheduled runs
+  in 44 h (about 11 of 12 a day), mostly 0–3 h after their cron time (the matching of
+  runs to cron times is not unique); 4–5 of them fell between 00:00 and 10:15 on each of
+  the two nights, one on the night of 25–26 Nov. Replay of all these start times
+  (`tests/test_gate.py`): every morning served at 10:15, no chain started outside the
+  window.
+- **Risks:** only three nights of data; if GitHub starts no trigger between 02:15 and
+  about 11:30, that day needs the local fallback. To be checked in the track record
+  (`runner`, `late`).
+- **Affects:** `scripts/gate.py`, `.github/workflows/daily.yml`, README.

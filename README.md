@@ -47,9 +47,11 @@ the naive forecast (M0) and LEAR-QRA (M1) run alongside for comparison.
 A new forecast is published every morning by a scheduled GitHub Actions job
 (`.github/workflows/daily.yml`) in [`forecasts/live/`](forecasts/live/), together with
 the running score of all past live forecasts against the real prices (`track_record.csv`).
-GitHub starts few of the scheduled triggers, at unpredictable times. So any run that does
-start either waits until 10:15 Berlin and forecasts, or, if that is too far off, sleeps
-and starts a fresh run of the job, which decides again (`scripts/gate.py`). Every
+GitHub starts scheduled triggers late (0–3 h) and on some nights hardly at all. So the
+triggers lie between 02:15 and 10:15 Berlin, and any run that does start either waits
+until 10:15 and forecasts, or, if that is too far off, sleeps and starts a fresh run of
+the job, which decides again; a run more than 8 h before 10:15 stops at once, so no
+runner waits outside that window (`scripts/gate.py`). Every
 forecast records when it was made,
 whether that was after the 12:00 auction (`late`), and where it ran (`runner`: GitHub
 Actions, or `local` for a fallback run by hand). The forecasts for 24–27 Nov 2026 were

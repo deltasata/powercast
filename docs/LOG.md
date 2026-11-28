@@ -568,3 +568,14 @@ validation`. CRPS [95 % block-bootstrap interval], €/MWh:
   starts the next chain as soon as the forecast is made, so in practice the job behaves
   like option B2 (an endless chain), which D12.3 set aside because of GitHub's terms.
   Open; to be decided.
+
+## Daily run: chain limited to 8 h before 10:15 (28 Nov 2026)
+
+- Delays of GitHub's scheduled triggers measured from the public run list (26 Nov 11:31
+  – 28 Nov 07:53 UTC): 22 runs in 44 h for 12 cron entries a day; 0–166 min after the
+  nearest earlier cron time (the matching is not unique when runs bunch up).
+- Change (D12.4): `scripts/gate.py` stops a run whose 10:15 issue time is more than 8 h
+  away; the 12 cron triggers moved to 01:17–07:53 UTC; at most 2 hand-overs. Runner
+  time per day drops from 24 h to at most about 8 h 20 min.
+- Tests: `tests/test_gate.py` replays every scheduled start time of 26–28 Nov
+  (8 gate tests; 31 tests in total pass; ruff clean).

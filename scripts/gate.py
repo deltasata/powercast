@@ -5,6 +5,8 @@ run therefore decides, from the clock and from which forecasts exist on main, wh
 
 - the next delivery day without a forecast is D; its issue time T is 10:15 Berlin on D−1;
 - if T has passed: forecast now (flagged late by the forecast script if after 12:00);
+- if T is more than WINDOW away: stop; a later trigger, inside the window, starts the
+  run (D12.4: no runner sits idle outside the window);
 - if T is at most MAX_WAIT away: wait until T, then forecast;
 - otherwise hand over ("relay"): sleep, then start a fresh run of the workflow by
   workflow_dispatch (the built-in token may do this), which decides again. The sleep
@@ -31,7 +33,8 @@ ISSUE = dt.time(10, 15)
 MAX_WAIT = dt.timedelta(minutes=230)     # wait + 110 min of work + margin < 355 min
 RELAY_TARGET = dt.timedelta(minutes=180)  # a fresh run starts this long before T
 MAX_SLEEP = dt.timedelta(minutes=330)
-MAX_HOPS = 6
+MAX_HOPS = 2                              # within WINDOW one hand-over suffices
+WINDOW = dt.timedelta(hours=8)            # D12.4: twice the longest gap seen (4 h 05)
 
 
 def decide(now: dt.datetime, exists: Callable[[dt.date], bool], hop: int) -> dict:
@@ -46,6 +49,8 @@ def decide(now: dt.datetime, exists: Callable[[dt.date], bool], hop: int) -> dic
         base = {"day": day.isoformat(), "issue": t.isoformat(), "hop": hop}
         if w <= dt.timedelta(0):
             return {**base, "mode": "forecast", "wait_s": 0}
+        if w > WINDOW:
+            return {**base, "mode": "stop", "reason": "outside the window"}
         if w <= MAX_WAIT:
             return {**base, "mode": "forecast", "wait_s": int(w.total_seconds())}
         if hop >= MAX_HOPS:

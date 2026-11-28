@@ -1,4 +1,4 @@
-"""The daily job's gate, replayed on the runs GitHub actually started (24-26 Nov 2026)."""
+"""The daily job's gate, replayed on the runs GitHub actually started (24-28 Nov 2026)."""
 
 import datetime as dt
 import importlib.util
@@ -39,13 +39,16 @@ def test_26_nov_run_at_0610_berlin_hands_over_and_forecasts_on_time():
     assert len(chain) == 2
 
 
-def test_evening_run_seeds_next_morning():
-    # 24 Nov 19:41 UTC: forecast for 25 Nov existed, so the chain aims at 26 Nov
-    chain = follow(dt.datetime(2026, 11, 24, 19, 41, tzinfo=UTC), have("2026-11-25"))
-    now, d = chain[-1]
-    assert d["mode"] == "forecast" and d["day"] == "2026-11-26"
-    assert d["wait_s"] <= gate.MAX_WAIT.total_seconds()
-    assert len(chain) - 1 <= gate.MAX_HOPS
+def test_evening_run_stops():
+    # 24 Nov 19:41 UTC: forecast for 25 Nov existed; 10:15 on 25 Nov is 13.6 h away
+    d = gate.decide(dt.datetime(2026, 11, 24, 19, 41, tzinfo=UTC), have("2026-11-25"), 0)
+    assert d["mode"] == "stop" and d["day"] == "2026-11-26"
+
+
+def test_run_after_the_forecast_stops_at_once():
+    # 27 Nov 09:39 UTC (started 09:24 UTC after the 28 Nov forecast was published)
+    d = gate.decide(dt.datetime(2026, 11, 27, 9, 24, tzinfo=UTC), have("2026-11-28"), 0)
+    assert d["mode"] == "stop"
 
 
 def test_missing_forecast_after_issue_time_runs_now():
@@ -60,12 +63,47 @@ def test_both_forecasts_exist_stops():
 
 
 def test_hop_limit_and_worst_case():
-    d = gate.decide(dt.datetime(2026, 11, 26, 11, 5, tzinfo=UTC), have("2026-11-27"),
+    d = gate.decide(dt.datetime(2026, 11, 26, 1, 20, tzinfo=UTC), have("2026-11-26"),
                     gate.MAX_HOPS)
     assert d["mode"] == "stop"
-    # worst case: a trigger just after the forecast was made, about 23 h before the next
-    chain = follow(dt.datetime(2026, 11, 26, 11, 1, tzinfo=UTC), have("2026-11-27"))
-    assert chain[-1][1]["mode"] == "forecast" and len(chain) - 1 <= gate.MAX_HOPS
+    # worst case: a trigger at the opening of the window, 8 h before 10:15
+    start = dt.datetime(2026, 11, 26, 1, 15, tzinfo=UTC)
+    chain = follow(start, have("2026-11-26"))
+    now, d = chain[-1]
+    assert d["mode"] == "forecast" and len(chain) - 1 <= gate.MAX_HOPS
+    end = now + dt.timedelta(seconds=d["wait_s"])
+    assert end - start <= gate.WINDOW
+    assert d["wait_s"] <= gate.MAX_WAIT.total_seconds()
+
+
+# start times (UTC) of the scheduled runs GitHub created, 26 Nov 05:10 - 28 Nov 07:53
+FIRED = """26 05:10, 26 11:31, 26 17:52, 26 18:23, 26 18:59, 26 19:49, 26 22:16, 26 23:59,
+27 01:47, 27 03:37, 27 08:39, 27 11:27, 27 14:04, 27 15:39, 27 17:38, 27 18:08,
+27 18:57, 27 19:39, 27 21:55, 27 23:39, 28 01:29, 28 03:15, 28 07:53"""
+
+
+def test_replay_observed_triggers():
+    """Each morning is served on time, and no runner is busy outside the 8 h window."""
+    fired = [dt.datetime(2026, 11, int(x[:2]), int(x[3:5]), int(x[6:8]), tzinfo=UTC)
+             for x in FIRED.replace("\n", " ").split(", ")]
+    made = {dt.date(2026, 11, 26)}                 # forecasts on main before the replay
+    exists = lambda day: day in made               # noqa: E731
+    busy_until = None
+    for t in fired:
+        if busy_until and t < busy_until:          # queued behind the running chain
+            t = busy_until
+        chain = follow(t, exists)
+        now, d = chain[-1]
+        if d["mode"] == "stop":
+            assert d["reason"] in ("outside the window", "the next two forecasts exist")
+            continue
+        end = now + dt.timedelta(seconds=d["wait_s"])
+        issue = dt.datetime.fromisoformat(d["issue"])
+        assert end <= max(issue, t) + dt.timedelta(minutes=1)
+        assert issue - t <= gate.WINDOW
+        made.add(dt.date.fromisoformat(d["day"]))
+        busy_until = end + dt.timedelta(minutes=10)
+    assert {dt.date(2026, 11, 27), dt.date(2026, 11, 28), dt.date(2026, 11, 29)} <= made
 
 
 def test_summer_time():
